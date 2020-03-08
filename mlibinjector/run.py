@@ -3,12 +3,11 @@
 __author__ = 'Sahil Dhar (@0x401)'
 __description__ = 'A handy script to inject Frida-Gadgets and enable debugging in Android applications'
 
-
 import os
-import argparse
 import lief
 import re
 
+from optparse import OptionParser
 from subprocess import Popen, PIPE
 from termcolor import colored
 from xml.etree import ElementTree as ET
@@ -221,10 +220,10 @@ def write_config(filename, host=None, port=None, s_file=None, s_dir=None):
 	if (host and port):
 		data = '''{
   "interaction": {
-    "type": "listen",
-    "address": "%s",
-    "port": %s,
-    "on_load": "wait"
+	"type": "listen",
+	"address": "%s",
+	"port": %s,
+	"on_load": "wait"
   }
 }''' % (host,port)
 		verbose(data)
@@ -233,10 +232,10 @@ def write_config(filename, host=None, port=None, s_file=None, s_dir=None):
 	elif port:
 		data = '''{
   "interaction": {
-    "type": "listen",
-    "address": "127.0.0.1",
-    "port": %s,
-    "on_load": "wait"
+	"type": "listen",
+	"address": "127.0.0.1",
+	"port": %s,
+	"on_load": "wait"
   }
 }''' % (port)
 		verbose(data)
@@ -245,18 +244,18 @@ def write_config(filename, host=None, port=None, s_file=None, s_dir=None):
 	elif s_file:
 		data = '''{
   "interaction": {
-    "type": "script",
-    "path": "%s",
-    "on_change": "reload"
+	"type": "script",
+	"path": "%s",
+	"on_change": "reload"
   }
 }''' % (s_file)
 		open(filename, 'w').write(data)
 	elif s_dir:
 		data = '''{
   "interaction": {
-    "type": "script-directory",
-    "path": "%s",
-    "on_change":"rescan"
+	"type": "script-directory",
+	"path": "%s",
+	"on_change":"rescan"
   }
 }''' % (s_dir)
 		verbose(data)
@@ -427,31 +426,33 @@ def main():
 	gadgetfile = 'libfrida-gadget.so'
 	configfile = 'libfrida-gadget.config.so'
 	arch = []
-	__description__ = 'a'
-	__author__ = 'b'
 
 	desc = '''
 [mlibinjector] -  %s - %s
 ''' % (__description__, __author__)
 
-	parser = argparse.ArgumentParser(description=desc, version='mlibinjector version: 1.0')
-	parser.add_argument('apkname', type=str, help='Apk Name')
-	parser.add_argument('-s', action='store_true', dest='sign', help='Sign apk')
-	parser.add_argument('-d', action='store_true', dest='decompile', help='Decompile using apktool')
-	parser.add_argument('-b', action='store_true', dest='build', help='Build & Sign & Zipalign')
-	parser.add_argument('-e', action='store_true', dest='enableDebug', help='Enable debug mode for apk')
-	parser.add_argument('-i', action='store_true', dest='injectFrida', help='Inject frida-gadget in *listen* mode (requires -p)')
-	parser.add_argument('-p', action='store', dest='libPath', help='Absolute path to downloaded frida-gadgets (.so) files')
-	parser.add_argument('--port', action='store', type=int, dest='port', help='Listen frida-gadget on port number in *listen mode*')
-	parser.add_argument('--host', action='store', dest='host', help='Listen frida-gadget on specific network interface in *listen mode*')
-	parser.add_argument('--script-file', action='store', dest='scriptfile', help='Path to script file on the device')
-	parser.add_argument('--script-dir', action='store', dest='scriptdir', help='Path to directory containing frida scripts on the device')
-	parser.add_argument('--native-lib', action='store', dest='nativelib', help='Name of exisiting native lib. Example "libnative-lib.so"')
-	parser.add_argument('--arch', action='store', dest='arch', help='Add frida gadget for particular arch.(arm64-v8a|armeabi-v7a|x86|x86_64)')
-	parser.add_argument('--random', action='store_true', dest='randomize', help='Randomize frida-gadget name')
-	parser.add_argument('-V', action='store_true', dest='verbose', help='Verbose')
+	parser = OptionParser(description=desc, version='mlibinjector version: 1.0', usage="usage: %prog [options] apkfile")
+	parser.add_option('-s', action='store_true', dest='sign', help='Sign apk')
+	parser.add_option('-d', action='store_true', dest='decompile', help='Decompile using apktool')
+	parser.add_option('-b', action='store_true', dest='build', help='Build & Sign & Zipalign')
+	parser.add_option('-e', action='store_true', dest='enableDebug', help='Enable debug mode for apk')
+	parser.add_option('-i', action='store_true', dest='injectFrida', help='Inject frida-gadget in *listen* mode (requires -p)')
+	parser.add_option('-p', action='store', dest='libPath', help='Absolute path to downloaded frida-gadgets (.so) files')
+	parser.add_option('--port', action='store', type=int, dest='port', help='Listen frida-gadget on port number in *listen mode*')
+	parser.add_option('--host', action='store', dest='host', help='Listen frida-gadget on specific network interface in *listen mode*')
+	parser.add_option('--script-file', action='store', dest='scriptfile', help='Path to script file on the device')
+	parser.add_option('--script-dir', action='store', dest='scriptdir', help='Path to directory containing frida scripts on the device')
+	parser.add_option('--native-lib', action='store', dest='nativelib', help='Name of exisiting native lib. Example "libnative-lib.so"')
+	parser.add_option('--arch', action='store', dest='arch', help='Add frida gadget for particular arch.(arm64-v8a|armeabi-v7a|x86|x86_64)')
+	parser.add_option('--random', action='store_true', dest='randomize', help='Randomize frida-gadget name')
+	parser.add_option('-V', action='store_true', dest='verbose', help='Verbose')
 
-	v = parser.parse_args()
+	(v, args) = parser.parse_args()
+	if len(args) != 1:
+		parser.print_help()
+		print(colored('E: Please Provide at least one argument', color='red'))
+		os._exit(1)
+	apkname = args[0]
 
 	if((v.port) and (v.port in range(1, 65535))):
 		port = v.port
@@ -486,21 +487,21 @@ def main():
 
 		arch = archs
 
-	if(v.apkname and os.path.isfile(v.apkname) and os.access(v.apkname, os.R_OK)):
+	if(apkname and os.path.isfile(apkname) and os.access(apkname, os.R_OK)):
 		if(v.sign):
-			sign_apk(v.apk_name)
+			sign_apk(apkname)
 
 		elif(v.decompile):
-			decompile_apk(v.apkname)
+			decompile_apk(apkname)
 
 		elif(v.build):
-			build_and_sign(v.apkname)
+			build_and_sign(apkname)
 
 		elif(v.enableDebug):
-			enable_debugging(v.apkname)
+			enable_debugging(apkname)
 
 		elif(v.injectFrida and v.libPath):
-			inject_frida_gadget(v.apkname, v.libPath)
+			inject_frida_gadget(apkname, v.libPath)
 		else:
 			parser.print_help()
 	else:
