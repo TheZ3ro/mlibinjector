@@ -109,3 +109,10 @@ mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-ga
 ```
 mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-gadgets" --arch x86 -V --random --script-dir "/data/local/tmp" --native-lib "libnative-lib.so"
 ```
+
+### TODO:
+- Don't decompile if a folder already exists
+- Add Support for arm short-named architecture
+- Select libfrida-gadget.so specifically
+- More options for frida-gadget-config
+- Use a better signing script (apksigner)
