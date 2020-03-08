@@ -4,11 +4,12 @@ __author__ = 'Sahil Dhar (@0x401)'
 __description__ = 'A handy script to inject Frida-Gadgets and enable debugging in Android applications'
 
 import os
-import lief
-import re
 
+from re import match
+from lief import parse as liefparse
+from json import dumps as jsondumps
 from optparse import OptionParser
-from subprocess import Popen, PIPE
+from subprocess import check_output as execute
 from termcolor import colored
 from xml.etree import ElementTree as ET
 from shutil import copyfile
@@ -29,8 +30,8 @@ android_namespace = 'http://schemas.android.com/apk/res/android'
 ET.register_namespace('android', android_namespace)
 
 tools = os.path.join(os.path.dirname(__file__), 'tools')
-apktool = "java -jar %s " % (os.path.join(tools, 'apktool.jar'))
-sign = "java -jar %s " % (os.path.join(tools, 'sign.jar'))
+apktool = os.path.join(tools, 'apktool.jar')
+sign = os.path.join(tools, 'sign.jar')
 
 
 def verbose(str):
@@ -38,12 +39,9 @@ def verbose(str):
 		print(colored('>>> %s' % str, 'yellow'))
 
 def exec_cmd(cmd):
-	verbose(cmd)
-	p = Popen(cmd, shell=True, stdin=PIPE, stderr=PIPE, stdout=PIPE)
-	r = p.communicate()
-	r = '\n'.join(x for x in r)
+	verbose(' '.join(cmd))
+	r = execute(cmd)
 	return r
-
 
 def inject_lib(native_lib, gadget_lib):
 	"""
@@ -51,8 +49,7 @@ def inject_lib(native_lib, gadget_lib):
 	requires android.permission.INTERNET in AndroidManifest.xml
 	when using server mode for frida-gadget.
 	"""
-
-	native = lief.parse(native_lib)
+	native = liefparse(native_lib)
 	native.add_library(gadget_lib)
 	native.write(native_lib)
 
@@ -85,7 +82,7 @@ def get_launchable_activity(apk_name):
 										activity_name = activity.attrib[name]
 										if activity_name.startswith('.'):
 											main_activities.append(package_name + activity_name)
-										elif re.match(r'^[a-zA-Z0-9-_]+$', activity_name):
+										elif match(r'^[a-zA-Z0-9-_]+$', activity_name):
 											main_activities.append(package_name + '.' + activity_name)
 										else:
 											main_activities.append(activity_name)
@@ -102,58 +99,48 @@ def get_launchable_activity(apk_name):
 										activity_name = activity.attrib[name]
 										if activity_name.startswith('.'):
 											main_activities.append(package_name + activity_name)
-										elif re.match(r'^[a-zA-Z0-9-_]+$', activity_name):
+										elif match(r'^[a-zA-Z0-9-_]+$', activity_name):
 											main_activities.append(package_name + '.' + activity_name)
 										else:
 											main_activities.append(activity_name)
 		return main_activities
-	except Exception as ex:
-		# print(ex)
+	except Exception:
 		pass
-
 
 def decompile_apk(apkname):
 	"""
 	Decompile apk file using apktool.jar
-
 	"""
 	verbose('Decompiling %s' % (apkname))
-	cmd = "%s d -f %s" % (apktool, apkname)
-	r = exec_cmd(cmd)
+	r = exec_cmd(["java", "-jar", apktool, "d", "-f", apkname])
 	verbose(r)
 	print(colored('I: Decompiled %s' % (apkname), color='green'))
-
 
 def sign_apk(apkname):
 	"""
 	sign apk using default developer certificate via sign.jar
 	"""
-	r = exec_cmd('%s %s' % (sign, apkname))
+	r = exec_cmd(["java", "-jar", sign, apkname])
 	verbose(r)
-
 
 def build_and_sign(apkname):
 	"""
 	Build using apktool.jar
 	sign again using sign.jar
-
 	"""
 	dirname = apkname.split('.apk')[0]
 	verbose('Building apk file')
-	cmd = '%s b -f %s' % (apktool, dirname)
-	r = exec_cmd(cmd)
+	r = exec_cmd(["java", "-jar", apktool, "b", "-f", dirname])
 	verbose(r)
 	print(colored('I: Build done', color='green'))
 	apkname = '%s/dist/%s' % (dirname, dirname + '.apk')
 	verbose('Signing %s' % apkname)
 	sign_apk(apkname)
 
-
 def enable_debugging(apkname):
 	"""
 	Enable debug flag in AndroidManifest.xml
 	Uses apktool.jar and sign.jar
-
 	"""
 	decompile_apk(apkname)
 	dirname = apkname.split('.apk')[0]
@@ -175,13 +162,10 @@ def check_permission(filename, filter):
 	"""
 	Check apk permission specified in filter by parsing AndroidManifest.xml
 	Currently used for checking android.permission.INTERNET permission.
-
 	"""
-
 	verbose('Checking permissions in %s' % filename)
 	parser = ET.parse(filename)
 	manifest = parser.getroot()
-	package_name = manifest.attrib['package'].replace('.', '/')
 	permissions = manifest.findall('uses-permission')
 	if len(permissions) > 0:
 		for perm in permissions:
@@ -200,7 +184,6 @@ def add_permission(filename, permission_name):
 	"""
 	Add permissions to apkfile specified in filter by parsing AndroidManifest.xml
 	Currently used for adding android.permission.INTERNET permission.
-
 	"""
 	verbose('Adding %s permission to %s' % (permission_name, filename))
 	parser = ET.parse(filename)
@@ -216,56 +199,38 @@ def write_config(filename, host=None, port=None, s_file=None, s_dir=None):
 	"""
 	Generates frida config file based on supplied parameters
 	"""
-
+	frida_conf = {"interaction": {}}
 	if (host and port):
-		data = '''{
-  "interaction": {
-	"type": "listen",
-	"address": "%s",
-	"port": %s,
-	"on_load": "wait"
-  }
-}''' % (host,port)
-		verbose(data)
-		open(filename, 'w').write(data)
-
+		frida_conf["interaction"]["type"] = "listen"
+		frida_conf["interaction"]["address"] = host
+		frida_conf["interaction"]["port"] = port
+		frida_conf["interaction"]["on_load"] = "wait"
 	elif port:
-		data = '''{
-  "interaction": {
-	"type": "listen",
-	"address": "127.0.0.1",
-	"port": %s,
-	"on_load": "wait"
-  }
-}''' % (port)
-		verbose(data)
-		open(filename, 'w').write(data)
-
+		frida_conf["interaction"]["type"] = "listen"
+		frida_conf["interaction"]["address"] = "127.0.0.1"
+		frida_conf["interaction"]["port"] = port
+		frida_conf["interaction"]["on_load"] = "wait"
+	elif host:
+		frida_conf["interaction"]["type"] = "listen"
+		frida_conf["interaction"]["address"] = host
+		frida_conf["interaction"]["port"] = "27042"
+		frida_conf["interaction"]["on_load"] = "wait"
 	elif s_file:
-		data = '''{
-  "interaction": {
-	"type": "script",
-	"path": "%s",
-	"on_change": "reload"
-  }
-}''' % (s_file)
-		open(filename, 'w').write(data)
+		frida_conf["interaction"]["type"] = "script"
+		frida_conf["interaction"]["path"] = s_file
+		frida_conf["interaction"]["on_change"] = "reload"
 	elif s_dir:
-		data = '''{
-  "interaction": {
-	"type": "script-directory",
-	"path": "%s",
-	"on_change":"rescan"
-  }
-}''' % (s_dir)
-		verbose(data)
-		open(filename, 'w').write(data)
+		frida_conf["interaction"]["type"] = "script-directory"
+		frida_conf["interaction"]["path"] = s_dir
+		frida_conf["interaction"]["on_change"] = "rescan"
+	data = jsondumps(frida_conf, indent=2)
+	verbose(data)
+	open(filename, 'w').write(data)
 
 def copy_libs(libpath, dirname):
 	"""
 	copy frida gadgets into /lib/<arch> folders
 	"""
-
 	global libdir
 	if len(arch) > 0:
 		for k in libdir.keys():
@@ -300,7 +265,6 @@ def inject_smali(filename):
 	"""
 	Injects smali prologue or smali direct methods in
 	launchable activities by parsing smali code  to load frida-gadgets.
-
 	"""
 	if nativelib:
 		verbose(libdir)
@@ -379,7 +343,6 @@ def inject_smali(filename):
 		wf.close()
 		print(colored('I: Smali code written to %s' % (_filename), color='green'))
 
-
 def inject_frida_gadget(apkname, libpath):
 	"""
 	Handles process of injecting Frida gadgets
@@ -412,7 +375,6 @@ def inject_frida_gadget(apkname, libpath):
 	print(colored('I: Frida Gadget injected', 'green'))
 	print(colored('I: Use command frida -U -n Gadget to connect to gadget :)', 'green'))
 
-
 def main():
 	global _verbose, arch, nativelib, host, port
 	global scriptfile, scriptdir, gadgetfile, configfile
@@ -427,9 +389,7 @@ def main():
 	configfile = 'libfrida-gadget.config.so'
 	arch = []
 
-	desc = '''
-[mlibinjector] -  %s - %s
-''' % (__description__, __author__)
+	desc = '''[mlibinjector] -  %s - %s''' % (__description__, __author__)
 
 	parser = OptionParser(description=desc, version='mlibinjector version: 1.0', usage="usage: %prog [options] apkfile")
 	parser.add_option('-s', action='store_true', dest='sign', help='Sign apk')
