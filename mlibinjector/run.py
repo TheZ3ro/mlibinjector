@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-__author__ = 'Sahil Dhar (@0x401)'
+__author__ = 'TheZero'
 __description__ = 'A handy script to inject Frida-Gadgets and enable debugging in Android applications'
 
 import os
@@ -9,13 +9,14 @@ from re import match
 from lief import parse as liefparse
 from json import dumps as jsondumps
 from optparse import OptionParser
-from subprocess import check_output as execute
+from subprocess import check_output as execute, STDOUT
 from termcolor import colored
 from xml.etree import ElementTree as ET
 from shutil import copyfile
 from glob import glob
 from random import randint, sample
 from string import ascii_lowercase
+from binascii import hexlify
 
 
 file_types = {
@@ -40,7 +41,7 @@ def verbose(str):
 
 def exec_cmd(cmd):
 	verbose(' '.join(cmd))
-	r = execute(cmd)
+	r = execute(cmd, stderr=STDOUT).decode()
 	return r
 
 def inject_lib(native_lib, gadget_lib):
@@ -58,7 +59,6 @@ def get_launchable_activity(apk_name):
 	Parses AndroidManifest.xml and returns all launchable activities
 	will throw an error for corrupted xml documents
 	"""
-
 	manifest_file = apk_name.split('.apk')[0] + '/AndroidManifest.xml'
 	name = '{http://schemas.android.com/apk/res/android}name'
 	try:
@@ -69,6 +69,7 @@ def get_launchable_activity(apk_name):
 		activities = root.findall('application')[0].findall('activity')
 		activity_alias = root.findall('application')[0].findall('activity-alias')
 
+		# TODO: Fix this other mess
 		if len(activities) > 0:
 			for activity in activities:
 				intent_filters = activity.findall('intent-filter')
@@ -120,8 +121,10 @@ def sign_apk(apkname):
 	"""
 	sign apk using default developer certificate via sign.jar
 	"""
+	verbose('Signing %s' % (apkname))
 	r = exec_cmd(["java", "-jar", sign, apkname])
 	verbose(r)
+	print(colored('I: Signed %s' % (apkname), color='green'))
 
 def build_and_sign(apkname):
 	"""
@@ -134,7 +137,6 @@ def build_and_sign(apkname):
 	verbose(r)
 	print(colored('I: Build done', color='green'))
 	apkname = '%s/dist/%s' % (dirname, dirname + '.apk')
-	verbose('Signing %s' % apkname)
 	sign_apk(apkname)
 
 def enable_debugging(apkname):
@@ -232,12 +234,14 @@ def copy_libs(libpath, dirname):
 	copy frida gadgets into /lib/<arch> folders
 	"""
 	global libdir
+	libs = {}
 	if len(arch) > 0:
-		for k in libdir.keys():
-			if k not in arch:
-				libdir.pop(k)
-
-	for dir in libdir.keys():
+		for k in libdir:
+			if k in arch:
+				libs[k] = libdir[k]
+	# TODO: FIX THIS MESS
+	libdir = libs
+	for dir in libdir:
 		libdir[dir] = os.path.join(dirname, 'lib', dir)
 		verbose(libdir[dir])
 		if not os.path.exists(libdir[dir]):
@@ -247,19 +251,21 @@ def copy_libs(libpath, dirname):
 	if os.path.exists(libpath):
 		lib_files = glob(libpath + '/*.so')
 		for src in lib_files:
-			sig = open(src, 'rb').read(32).encode('hex')
-			for key in libdir.keys():
+			sig = hexlify(open(src, 'rb').read(32)).decode()
+			for key in libdir:
 				if sig == file_types[key]:
 					dest = os.path.join(libdir[key], gadgetfile)
 					_configfile = os.path.join(libdir[key], configfile)
 					verbose('%s --> %s' % (src, dest))
 					copyfile(src, dest)
-					write_config(_configfile, host=host, port=port, s_file=scriptfile, s_dir=scriptdir)
+					if confPath is None:
+						write_config(_configfile, host=host, port=port, s_file=scriptfile, s_dir=scriptdir)
+					else:
+						copyfile(confPath, _configfile)
 
 	else:
 		print(colored('E: Please provide the path to frida-gadget lib(.so) files', color='red'))
 		os._exit(1)
-
 
 def inject_smali(filename):
 	"""
@@ -376,11 +382,12 @@ def inject_frida_gadget(apkname, libpath):
 	print(colored('I: Use command frida -U -n Gadget to connect to gadget :)', 'green'))
 
 def main():
-	global _verbose, arch, nativelib, host, port
+	global _verbose, arch, nativelib, host, port, confPath
 	global scriptfile, scriptdir, gadgetfile, configfile
 
 	port = None
 	host = None
+	confPath = None
 	scriptfile = None
 	scriptdir = None
 	nativelib = None
@@ -398,6 +405,7 @@ def main():
 	parser.add_option('-e', action='store_true', dest='enableDebug', help='Enable debug mode for apk')
 	parser.add_option('-i', action='store_true', dest='injectFrida', help='Inject frida-gadget in *listen* mode (requires -p)')
 	parser.add_option('-p', action='store', dest='libPath', help='Absolute path to downloaded frida-gadgets (.so) files')
+	parser.add_option('-c', action='store', dest='confPath', help='Absolute path to the frida-gadgets config file (.config.so)')
 	parser.add_option('--port', action='store', type=int, dest='port', help='Listen frida-gadget on port number in *listen mode*')
 	parser.add_option('--host', action='store', dest='host', help='Listen frida-gadget on specific network interface in *listen mode*')
 	parser.add_option('--script-file', action='store', dest='scriptfile', help='Path to script file on the device')
@@ -420,6 +428,9 @@ def main():
 	if v.host:
 		host = v.host
 		verbose(host)
+
+	if v.confPath:
+		confPath = v.confPath
 
 	if v.scriptfile:
 		scriptfile = v.scriptfile
