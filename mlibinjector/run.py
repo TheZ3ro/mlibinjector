@@ -163,26 +163,23 @@ class Injector():
 		apkname = '%s/dist/%s' % (dirname, dirname + '.apk')
 		self.sign_apk(apkname)
 
-	def enable_debugging(apkname):
+	def enable_debugging(self, apkname):
 		"""
 		Enable debug flag in AndroidManifest.xml
 		Uses apktool.jar and sign.jar
 		"""
-		decompile_apk(apkname)
+		self.decompile_apk(apkname)
 		dirname = apkname.split('.apk')[0]
 		filename = dirname + '/AndroidManifest.xml'
-		verbose('Enabling android-debug:true in %s' % filename)
+		self.verbose('Enabling android-debug:true in %s' % filename)
 		fp = open(filename, 'r')
 		parser = ET.parse(fp)
-		application = parser.getroot()[0]
+		application = parser.getroot().findall('application')[0]
 		keyname = '{http://schemas.android.com/apk/res/android}debuggable'
-		if keyname in application.attrib:
-			application.attrib[keyname] = 'true'
-		else:
-			application.attrib[keyname] = 'true'
+		application.attrib[keyname] = 'true'
 		parser.write(filename, encoding='utf-8', xml_declaration=True)
 		print(colored('I: Enabled android-debug:true in %s' % filename, color='green'))
-		build_and_sign(dirname)
+		self.build_and_sign(dirname)
 
 	def check_permission(filename, filter):
 		"""
