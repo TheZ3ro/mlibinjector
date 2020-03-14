@@ -112,7 +112,4 @@ mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-ga
 
 ### TODO:
 - Don't decompile if a folder already exists
-- Add Support for arm short-named architecture
-- Select libfrida-gadget.so specifically
-- More options for frida-gadget-config
 - Use a better signing script (apksigner)
