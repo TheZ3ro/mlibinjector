@@ -1,11 +1,11 @@
-prologue_stmt = """
+smali_prologue = """
 
 	const-string v0, "%s"
 
 	invoke-static {v0}, Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V
 
 """
-direct_method = """
+smali_direct_method = """
 
 .method static constructor <clinit>()V
 	.locals 1
@@ -17,4 +17,4 @@ direct_method = """
 .end method
 
 
-""".format(prologue_stmt)
+""".format(smali_prologue)

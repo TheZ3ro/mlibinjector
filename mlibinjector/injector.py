@@ -12,7 +12,7 @@ from random import randint, sample
 from string import ascii_lowercase
 from binascii import hexlify
 
-from .smali_helpers import *
+from .smali_helpers import smali_prologue, smali_direct_method
 
 android_namespace = 'http://schemas.android.com/apk/res/android'
 ET.register_namespace('android', android_namespace)
@@ -313,14 +313,14 @@ class Injector():
 		if self.nativelib:
 			self.verbose(self.libdir)
 			for key, ldir in self.libdir.iteritems():
-				_nativelib = os.path.join(ldir, nativelib)
+				_nativelib = os.path.join(ldir, self.nativelib)
 				self.verbose(_nativelib)
 				self.inject_lib(_nativelib, self.gadgetfile)
 		else:
 			_filename = os.path.basename(filename)
-			prologue_stmt = prologue_stmt % (gadgetfile.split('.so')[0][3:])
-			direct_method = direct_method % (gadgetfile.split('.so')[0][3:])
-			verbose('Injecting smali code in %s' % (_filename))
+			prologue_stmt = smali_prologue % (self.gadgetfile.split('.so')[0][3:])
+			direct_method = smali_direct_method % (self.gadgetfile.split('.so')[0][3:])
+			self.verbose('Injecting smali code in %s' % (_filename))
 			rf = open(filename, 'r')
 			lines = rf.readlines()
 			rf.close()
@@ -343,13 +343,13 @@ class Injector():
 
 						if '.prologue' in line:
 							lines.insert(cursor + 2, prologue_stmt)
-							verbose('Smali prologue injected')
+							self.verbose('Smali prologue injected')
 							break
 
 						# No .prologue found write after constructor
 						elif '.end method' in line:
 							lines.insert(method_start + 1, prologue_stmt)
-							verbose('Smali prologue injected')
+							self.verbose('Smali prologue injected')
 							break
 						else:
 							cursor += 1
@@ -359,7 +359,7 @@ class Injector():
 					# print("Index is at %d" %index)
 					# print("Cursor is at %d" %cursor)
 					lines.insert(cursor, direct_method)
-					verbose('Static constructor injected')
+					self.verbose('Static constructor injected')
 					break
 
 			wf = open(filename, 'w')
@@ -391,8 +391,6 @@ class Injector():
 			activity_file_path = activity_name.replace('.', '/')
 			main_activityfile = os.path.join(self.dirname, 'smali', activity_file_path + '.smali')
 			self.inject_smali(main_activityfile)
-
-		exit()
 
 		self.build_and_sign()
 		print(colored('I: Frida Gadget injected', 'green'))
