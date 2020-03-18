@@ -35,6 +35,7 @@ class Injector():
 	def __init__(self, apkname):
 		self.port = None
 		self.host = None
+		self.force = False
 		self.confpath = None
 		self.scriptfile = None
 		self.scriptdir = None
@@ -142,9 +143,12 @@ class Injector():
 		if not self.apk:
 			raise InjectorException("E: Please Provide a valid apk file")
 		self.verbose('Decompiling %s' % (self.apkname))
-		r = self.exec_cmd(["java", "-jar", apktool, "d", "-f", self.apkname])
-		self.verbose(r)
-		print(colored('I: Decompiled %s' % (self.apkname), color='green'))
+		if self.force or not os.path.isdir(self.dirname):
+			r = self.exec_cmd(["java", "-jar", apktool, "d", "-f", self.apkname])
+			self.verbose(r)
+			print(colored('I: Decompiled %s' % (self.apkname), color='green'))
+		else:
+			print(colored('I: APK already decompiled previously. Using cache for %s' % (self.apkname), color='green'))
 
 	def sign_apk(self):
 		"""

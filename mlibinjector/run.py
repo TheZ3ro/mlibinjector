@@ -21,6 +21,7 @@ def main():
 	parser.add_option('-i', action='store_true', dest='injectFrida', help='Inject frida-gadget in *listen* mode (requires -p)')
 	parser.add_option('-p', action='store', dest='libPath', help='Absolute path to downloaded frida-gadgets (.so) files')
 	parser.add_option('-c', action='store', dest='confpath', help='Absolute path to the frida-gadgets config file (.config.so)')
+	parser.add_option('-f', action='store_true', dest='force', help='Force decompilation and overwrite previous one')
 	parser.add_option('--port', action='store', type=int, dest='port', help='Listen frida-gadget on port number in *listen mode*')
 	parser.add_option('--host', action='store', dest='host', help='Listen frida-gadget on specific network interface in *listen mode*')
 	parser.add_option('--script-file', action='store', dest='scriptfile', help='Path to script file on the device')
@@ -50,6 +51,9 @@ def main():
 
 	if v.host:
 		inj.host = v.host
+
+	if v.force:
+		inj.force = v.force
 
 	if v.confpath:
 		inj.confpath = v.confpath

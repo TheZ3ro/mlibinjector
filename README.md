@@ -111,5 +111,4 @@ mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-ga
 ```
 
 ### TODO:
-- Don't decompile if a folder already exists
 - Use a better signing script (apksigner)
