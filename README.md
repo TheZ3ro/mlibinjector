@@ -23,7 +23,7 @@ To install mlibinjector for all users of the system
 ```
 Usage: mlibinjector [options] apkfile
 
-[mlibinjector 2.0] -  A handy script to inject Frida-Gadgets and enable
+[mlibinjector 2.0.1] -  A handy script to inject Frida-Gadgets and enable
 debugging in Android applications - TheZero (@Th3Zer0) & Sahil Dhar (@0x401)
 
 Options:
@@ -33,11 +33,14 @@ Options:
   -d                    Decompile using apktool
   -b                    Build & Sign & Zipalign
   -e                    Enable debug mode for apk
+  -n                    Inject a custon network_security_config.xml file
   -i                    Inject frida-gadget in *listen* mode (requires -p)
   -p LIBPATH            Absolute path to downloaded frida-gadgets (.so) files
   -c CONFPATH           Absolute path to the frida-gadgets config file
                         (.config.so)
   -f                    Force decompilation and overwrite previous one
+  --network=NETCONFPATH
+                        Absolute path to the network_security_config.xml file
   --port=PORT           Listen frida-gadget on port number in *listen mode*
   --host=HOST           Listen frida-gadget on specific network interface in
                         *listen mode*
@@ -76,15 +79,27 @@ Options:
 ```
 mlibinjector box.apk -b -V
 ```
+
 ### Enable Debug mode
 ```
 mlibinjector box.apk -e -V
-
 ```
+
+### Inject a default network_security_config.xml file
+```
+mlibinjector box.apk -n -V
+```
+
+### Inject a network_security_config.xml file
+```
+mlibinjector box.apk -n -V --network .\net.xml
+```
+
 ### Inject Frida gadgets for all supported architectures.
 ```
 mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-gadgets" -V
 ```
+
 ### Inject Frida gadgets (For particular architecture)
 > Use this option only when you are sure about the arch you are building the app for.
 ```
@@ -95,6 +110,7 @@ mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-ga
 ```
 mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-gadgets" --arch x86 -V --random
 ```
+
 ### Run frida gadget on custom port for device arch:x86
 > Below command will run frida gadget on custom port 21212.
 ```
@@ -112,6 +128,7 @@ mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-ga
 ```
 mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-gadgets" --arch x86 -V --random --script-dir "/data/local/tmp/scripts"
 ```
+
 ### Inject frida gadget in serverless mode for device arch:x86 using existing native library
 > This command will add frida gadet as a dependency to existing native library and thus will not tamper smali code/AndroidManifest.xml file.
 ```
@@ -120,3 +137,5 @@ mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-ga
 
 # TODO:
 - Use a better signing script (apksigner)
+- Inject smali revshell / drozer
+- Add custom permissions
