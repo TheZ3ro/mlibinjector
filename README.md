@@ -1,51 +1,59 @@
 # mlibinjector
 A handy script to inject Frida-Gadgets and enable debugging in Android applications.
 
+Now with Python3 support.
+
+Based on previous work from:
+- Sahil Dhar (https://github.com/sahildhar/mlibinjector)
+
+
 # Installation
 
 Execute following commands from your terminal 
 
 To install mlibinjector for current user only
 
-```python setup.py install --user```
+```python3 setup.py install --user```
 
 To install mlibinjector for all users of the system
 
-```sudo python setup.py install```
+```sudo python3 setup.py install```
 
 
 ```
-usage: mlibinjector.py [-h] [-v] [-s] [-d] [-b] [-e] [-i] [-p LIBPATH] [--port PORT]
-                 [--script-file SCRIPTFILE] [--script-dir SCRIPTDIR]
-                 [--native-lib NATIVELIB] [--arch ARCH] [--random] [-V]
-                 apkname
+Usage: mlibinjector [options] apkfile
 
-[mlibinjector] by - Sahil Dhar - (Twitter: @0x401)
+[mlibinjector 2.0] -  A handy script to inject Frida-Gadgets and enable
+debugging in Android applications - TheZero (@Th3Zer0) & Sahil Dhar (@0x401)
 
-positional arguments:
-  apkname               Apk Name
-
-optional arguments:
+Options:
+  --version             show program's version number and exit
   -h, --help            show this help message and exit
-  -v, --version         show program's version number and exit
   -s                    Sign apk
   -d                    Decompile using apktool
   -b                    Build & Sign & Zipalign
   -e                    Enable debug mode for apk
   -i                    Inject frida-gadget in *listen* mode (requires -p)
   -p LIBPATH            Absolute path to downloaded frida-gadgets (.so) files
-  --port PORT           Listen frida-gadget on port number in *listen mode*
-  --script-file SCRIPTFILE
+  -c CONFPATH           Absolute path to the frida-gadgets config file
+                        (.config.so)
+  -f                    Force decompilation and overwrite previous one
+  --port=PORT           Listen frida-gadget on port number in *listen mode*
+  --host=HOST           Listen frida-gadget on specific network interface in
+                        *listen mode*
+  --script-file=SCRIPTFILE
                         Path to script file on the device
-  --script-dir SCRIPTDIR
+  --script-dir=SCRIPTDIR
                         Path to directory containing frida scripts on the
                         device
-  --native-lib NATIVELIB
-                        Path to exisiting native lib
-  --arch ARCH           Add frida gadget for particular arch.(arm64-v8a
-                        |armeabi-v7a|x86|x86_64)
+  --native-lib=NATIVELIB
+                        Name of exisiting native lib. Example "libnative-
+                        lib.so"
+  --arch=ARCH           Add frida gadget for particular
+                        arch.(arm64-v8a|armeabi-v7a|x86|x86_64)
   --random              Randomize frida-gadget name
   -V                    Verbose
+
 ```
 
 ### Following advanced options can be used to bypass anti-debugging features set by the application specifically for Frida
@@ -110,5 +118,5 @@ mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-ga
 mlibinjector box.apk  -i -p "C:\Tools\Android\androidtools\mlibinjector\frida-gadgets" --arch x86 -V --random --script-dir "/data/local/tmp" --native-lib "libnative-lib.so"
 ```
 
-### TODO:
+# TODO:
 - Use a better signing script (apksigner)

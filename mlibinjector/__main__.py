@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 
-__author__ = 'TheZero'
-__description__ = 'A handy script to inject Frida-Gadgets and enable debugging in Android applications'
-
 import os
 
 from optparse import OptionParser
 from termcolor import colored
 
 from . import Injector, InjectorException
+from .__info__ import __authors__, __version__, __description__
 
 def main():
-	desc = '''[mlibinjector] -  %s - %s''' % (__description__, __author__)
+	desc = '''[mlibinjector %s] -  %s - %s''' % (__version__, __description__, ' & '.join(__authors__))
 
 	parser = OptionParser(description=desc, version='mlibinjector version: 1.0', usage="usage: %prog [options] apkfile")
 	parser.add_option('-s', action='store_true', dest='sign', help='Sign apk')
