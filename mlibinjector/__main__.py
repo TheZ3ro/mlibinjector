@@ -16,10 +16,12 @@ def main():
 	parser.add_option('-d', action='store_true', dest='decompile', help='Decompile using apktool')
 	parser.add_option('-b', action='store_true', dest='build', help='Build & Sign & Zipalign')
 	parser.add_option('-e', action='store_true', dest='enableDebug', help='Enable debug mode for apk')
+	parser.add_option('-n', action='store_true', dest='injectNetconf', help='Inject a custon network_security_config.xml file')
 	parser.add_option('-i', action='store_true', dest='injectFrida', help='Inject frida-gadget in *listen* mode (requires -p)')
 	parser.add_option('-p', action='store', dest='libPath', help='Absolute path to downloaded frida-gadgets (.so) files')
 	parser.add_option('-c', action='store', dest='confpath', help='Absolute path to the frida-gadgets config file (.config.so)')
 	parser.add_option('-f', action='store_true', dest='force', help='Force decompilation and overwrite previous one')
+	parser.add_option('--network', action='store', dest='netconfpath', help='Absolute path to the network_security_config.xml file')
 	parser.add_option('--port', action='store', type=int, dest='port', help='Listen frida-gadget on port number in *listen mode*')
 	parser.add_option('--host', action='store', dest='host', help='Listen frida-gadget on specific network interface in *listen mode*')
 	parser.add_option('--script-file', action='store', dest='scriptfile', help='Path to script file on the device')
@@ -52,6 +54,9 @@ def main():
 
 	if v.force:
 		inj.force = v.force
+
+	if v.netconfpath:
+		inj.netconfpath = v.netconfpath
 
 	if v.confpath:
 		inj.confpath = v.confpath
@@ -93,6 +98,9 @@ def main():
 
 		elif(v.enableDebug):
 			inj.enable_debugging()
+
+		elif(v.injectNetconf):
+			inj.inject_network_security_config()
 
 		elif(v.injectFrida and v.libPath):
 			inj.inject_frida_gadget(v.libPath)

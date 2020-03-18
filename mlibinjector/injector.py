@@ -12,7 +12,7 @@ from random import randint, sample
 from string import ascii_lowercase
 from binascii import hexlify
 
-from .smali_helpers import smali_prologue, smali_direct_method
+from .helpers import smali_prologue, smali_direct_method, xml_netsecconf
 
 android_namespace = 'http://schemas.android.com/apk/res/android'
 ET.register_namespace('android', android_namespace)
@@ -37,6 +37,7 @@ class Injector():
 		self.host = None
 		self.force = False
 		self.confpath = None
+		self.netconfpath = None
 		self.scriptfile = None
 		self.scriptdir = None
 		self.nativelib = None
@@ -399,3 +400,31 @@ class Injector():
 		self.build_and_sign()
 		print(colored('I: Frida Gadget injected', 'green'))
 		print(colored('I: Use command frida -U -n Gadget to connect to gadget :)', 'green'))
+
+	def inject_network_security_config(self):
+		"""
+		Inject a network-security-config in AndroidManifest.xml and in APK file
+		Uses apktool.jar and sign.jar
+		"""
+		if not self.apk:
+			raise InjectorException("E: Please Provide a valid apk file")
+		self.decompile_apk()
+		self.manifest = self.dirname + '/AndroidManifest.xml'
+		self.verbose('Injecting network_security_config.xml file in %s' % self.manifest)
+		if self.netconfpath and os.path.isfile(self.netconfpath) and os.access(self.netconfpath, os.R_OK):
+			copyfile(self.netconfpath, os.path.join(self.dirname, 'res', 'xml'))
+		else:
+			xmldir = os.path.join(self.dirname, 'res', 'xml')
+			if not os.path.isdir(xmldir):
+				os.makedirs(xmldir)
+			netsecfile = open(os.path.join(xmldir, 'network_security_config.xml'), 'w')
+			netsecfile.write(xml_netsecconf)
+			netsecfile.close()
+		fp = open(self.manifest, 'r')
+		parser = ET.parse(fp)
+		application = parser.getroot().findall('application')[0]
+		keyname = '{http://schemas.android.com/apk/res/android}networkSecurityConfig'
+		application.attrib[keyname] = '@xml/network_security_config'
+		parser.write(self.manifest, encoding='utf-8', xml_declaration=True)
+		print(colored('I: Successfully injected network_security_config.xml in %s' % self.manifest, color='green'))
+		self.build_and_sign()
