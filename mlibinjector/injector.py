@@ -1,4 +1,5 @@
 import os
+import logging
 
 from re import match
 from lief import parse as liefparse
@@ -21,6 +22,9 @@ tools = os.path.join(os.path.dirname(__file__), 'tools')
 apktool = os.path.join(tools, 'apktool.jar')
 sign = os.path.join(tools, 'sign.jar')
 
+logger = logging.getLogger('mlibinjector')
+
+
 class InjectorException(Exception):
 	pass
 
@@ -41,11 +45,10 @@ class Injector():
 		self.scriptfile = None
 		self.scriptdir = None
 		self.nativelib = None
-		self._verbose = False
 		self.gadgetfile = 'libfrida-gadget.so'
 		self.configfile = 'libfrida-gadget.config.so'
 
-		self.arch = list(Injector.abi.keys())
+		self.arch = list()
 
 		if apkname and os.path.isfile(apkname) and os.access(apkname, os.R_OK):
 			if apkname[-4:] != '.apk':
@@ -67,12 +70,8 @@ class Injector():
 		self.gadgetfile = 'lib%s.so' % name
 		self.configfile = 'lib%s.config.so' % name
 
-	def verbose(self, str):
-		if self._verbose:
-			print(colored('>>> %s' % str, 'yellow'))
-
 	def exec_cmd(self, cmd):
-		self.verbose(' '.join(cmd))
+		logger.debug(' '.join(cmd))
 		r = execute(cmd, stderr=STDOUT).decode()
 		return r
 
@@ -133,7 +132,7 @@ class Injector():
 
 			return main_activities
 		except Exception as e:
-			print(e)
+			logger.error(e)
 			exit(1)
 			pass
 
@@ -143,13 +142,13 @@ class Injector():
 		"""
 		if not self.apk:
 			raise InjectorException("E: Please Provide a valid apk file")
-		self.verbose('Decompiling %s' % (self.apkname))
+		logger.debug('Decompiling %s' % (self.apkname))
 		if self.force or not os.path.isdir(self.dirname):
 			r = self.exec_cmd(["java", "-jar", apktool, "d", "-f", self.apkname])
-			self.verbose(r)
-			print(colored('I: Decompiled %s' % (self.apkname), color='green'))
+			logger.debug(r)
+			logger.info('Decompiled %s' % (self.apkname))
 		else:
-			print(colored('I: APK already decompiled previously. Using cache for %s' % (self.apkname), color='green'))
+			logger.info('APK already decompiled previously. Using cache for %s' % (self.apkname))
 
 	def sign_apk(self):
 		"""
@@ -157,20 +156,20 @@ class Injector():
 		"""
 		if not self.apk:
 			raise InjectorException("E: Please Provide a valid apk file")
-		self.verbose('Signing %s' % (self.apkname))
+		logger.debug('Signing %s' % (self.apkname))
 		r = self.exec_cmd(["java", "-jar", sign, self.apkname])
-		self.verbose(r)
-		print(colored('I: Signed %s' % (self.apkname), color='green'))
+		logger.debug(r)
+		logger.info('Signed %s' % (self.apkname))
 
 	def build_and_sign(self):
 		"""
 		Build using apktool.jar
 		sign again using sign.jar
 		"""
-		self.verbose('Building apk file from %s' % (self.dirname))
+		logger.debug('Building apk file from %s' % (self.dirname))
 		r = self.exec_cmd(["java", "-jar", apktool, "b", "-f", self.dirname])
-		self.verbose(r)
-		print(colored('I: Build done', color='green'))
+		logger.debug(r)
+		logger.info('Build done')
 		self.apkname = '%s/dist/%s' % (self.dirname, self.dirname + '.apk')
 		self.sign_apk()
 
@@ -183,14 +182,14 @@ class Injector():
 			raise InjectorException("E: Please Provide a valid apk file")
 		self.decompile_apk()
 		self.manifest = self.dirname + '/AndroidManifest.xml'
-		self.verbose('Enabling android-debug:true in %s' % self.manifest)
+		logger.debug('Enabling android-debug:true in %s' % self.manifest)
 		fp = open(self.manifest, 'r')
 		parser = ET.parse(fp)
 		application = parser.getroot().findall('application')[0]
 		keyname = '{http://schemas.android.com/apk/res/android}debuggable'
 		application.attrib[keyname] = 'true'
 		parser.write(self.manifest, encoding='utf-8', xml_declaration=True)
-		print(colored('I: Enabled android-debug:true in %s' % self.manifest, color='green'))
+		logger.info('Enabled android-debug:true in %s' % self.manifest)
 		self.build_and_sign()
 
 	def check_permission(self, perm_filter):
@@ -198,20 +197,20 @@ class Injector():
 		Check apk permission specified in filter by parsing AndroidManifest.xml
 		Currently used for checking android.permission.INTERNET permission.
 		"""
-		self.verbose('Checking permissions in %s' % self.manifest)
+		logger.debug('Checking permissions in %s' % self.manifest)
 		parser = ET.parse(self.manifest)
 		manifest = parser.getroot()
 		permissions = manifest.findall('uses-permission')
 		if len(permissions) > 0:
 			for perm in permissions:
 				name = '{%s}name' % android_namespace
-				self.verbose('uses-permission: %s' % (perm.attrib[name]))
+				logger.debug('uses-permission: %s' % (perm.attrib[name]))
 				if perm.attrib[name] == perm_filter:
 					return True
 				else:
 					return False
 		else:
-			self.verbose('No permissions are defined in %s' % (self.manifest))
+			logger.debug('No permissions are defined in %s' % (self.manifest))
 			return False
 
 	def add_permission(self, permission_name):
@@ -219,7 +218,7 @@ class Injector():
 		Add permissions to apkfile specified in filter by parsing AndroidManifest.xml
 		Currently used for adding android.permission.INTERNET permission.
 		"""
-		self.verbose('Adding %s permission to %s' % (permission_name, self.manifest))
+		logger.debug('Adding %s permission to %s' % (permission_name, self.manifest))
 		parser = ET.parse(self.manifest)
 		manifest = parser.getroot()
 		perm_element = ET.Element('uses-permission')
@@ -227,7 +226,7 @@ class Injector():
 		perm_element.attrib[name] = permission_name
 		manifest.append(perm_element)
 		parser.write(self.manifest, encoding='utf-8', xml_declaration=True)
-		print(colored('I: Added %s permission to %s' % (permission_name, self.manifest), 'green'))
+		logger.info('Added %s permission to %s' % (permission_name, self.manifest))
 
 	def write_config(self, filename):
 		"""
@@ -258,7 +257,7 @@ class Injector():
 			frida_conf["interaction"]["path"] = self.scriptdir
 			frida_conf["interaction"]["on_change"] = "rescan"
 		data = jsondumps(frida_conf, indent=2)
-		verbose(data)
+		logger.debug(data)
 		open(filename, 'w').write(data)
 
 	def copy_libs(self, libpath):
@@ -276,7 +275,7 @@ class Injector():
 			if not os.path.exists(libdir[lib]):
 				os.makedirs(libdir[lib])
 			else:
-				self.verbose('Dir %s already exists' % (libdir[lib]))
+				logger.debug('Dir %s already exists' % (libdir[lib]))
 
 		lib_files = []
 		if os.path.exists(libpath) and os.path.isfile(libpath) and os.access(libpath, os.R_OK):
@@ -284,7 +283,7 @@ class Injector():
 		elif os.path.exists(libpath) and os.path.isdir(libpath):
 			lib_files.extend(glob(libpath + '/*.so'))
 		else:
-			print(colored('E: Please provide the path to frida-gadget lib(.so) files', color='red'))
+			logger.error('Please provide the path to frida-gadget lib(.so) files')
 			os._exit(1)
 
 		# For each .so file, find its abi and copy in the lib folder
@@ -292,23 +291,24 @@ class Injector():
 			if '.config.so' in src:
 				continue
 			sig = hexlify(open(src, 'rb').read(32)).decode()
+			# for every supoprted abi, get the one with matching signature with the current .so
 			abi = [abi for abi, signature in Injector.abi.items() if signature == sig]
 			if len(abi) == 0:
-				print(colored('E: Arch not supported for file {}'.format(src), color='red'))
+				logger.error('Arch not supported for file {}'.format(src))
 				continue
 			abi = abi[0]
 			if abi in libdir:
-				print(colored('I: Found {} with arch "{}"'.format(src, abi), color='green'))
+				logger.info('Found {} with arch "{}"'.format(src, abi))
 				dest = os.path.join(libdir[abi], self.gadgetfile)
 				copyfile(src, dest)
-				self.verbose('%s --> %s' % (src, dest))
+				logger.debug('%s --> %s' % (src, dest))
 				_configfile = os.path.join(libdir[abi], self.configfile)
 				if self.confpath is None:
 					self.write_config(_configfile)
 				else:
 					copyfile(self.confpath, _configfile)
 			else:
-				print(colored('W: Arch "{}" not selected for file {}'.format(abi, src), color='yellow'))
+				logger.warn('Arch "{}" not selected for file {}'.format(abi, src))
 
 	def inject_smali(self, filename):
 		"""
@@ -316,16 +316,16 @@ class Injector():
 		launchable activities by parsing smali code  to load frida-gadgets.
 		"""
 		if self.nativelib:
-			self.verbose(self.libdir)
+			logger.debug(self.libdir)
 			for key, ldir in self.libdir.iteritems():
 				_nativelib = os.path.join(ldir, self.nativelib)
-				self.verbose(_nativelib)
+				logger.debug(_nativelib)
 				self.inject_lib(_nativelib, self.gadgetfile)
 		else:
 			_filename = os.path.basename(filename)
 			prologue_stmt = smali_prologue % (self.gadgetfile.split('.so')[0][3:])
 			direct_method = smali_direct_method % (self.gadgetfile.split('.so')[0][3:])
-			self.verbose('Injecting smali code in %s' % (_filename))
+			logger.debug('Injecting smali code in %s' % (_filename))
 			rf = open(filename, 'r')
 			lines = rf.readlines()
 			rf.close()
@@ -343,34 +343,31 @@ class Injector():
 
 				if (s_constructor):
 					if (index == cursor):
-						# print("Cursor is at %d" %cursor)
 						# Found prologue write after it
 
 						if '.prologue' in line:
 							lines.insert(cursor + 2, prologue_stmt)
-							self.verbose('Smali prologue injected')
+							logger.debug('Smali prologue injected')
 							break
 
 						# No .prologue found write after constructor
 						elif '.end method' in line:
 							lines.insert(method_start + 1, prologue_stmt)
-							self.verbose('Smali prologue injected')
+							logger.debug('Smali prologue injected')
 							break
 						else:
 							cursor += 1
 
 				# Couldn't find the static constructor, injecting static constructor
 				elif (s_constructor is False and cursor is not None and index == eof):
-					# print("Index is at %d" %index)
-					# print("Cursor is at %d" %cursor)
 					lines.insert(cursor, direct_method)
-					self.verbose('Static constructor injected')
+					logger.debug('Static constructor injected')
 					break
 
 			wf = open(filename, 'w')
 			wf.writelines(lines)
 			wf.close()
-			print(colored('I: Smali code written to %s' % (_filename), color='green'))
+			logger.info('Smali code written to %s' % (_filename))
 
 	def inject_frida_gadget(self, libpath):
 		"""
@@ -378,7 +375,7 @@ class Injector():
 		"""
 		if not self.apk:
 			raise InjectorException("E: Please Provide a valid apk file")
-		self.verbose('Injecting frida gagdet in %s' % self.apkname)
+		logger.debug('Injecting frida gagdet in %s' % self.apkname)
 		self.decompile_apk()
 		self.manifest = self.dirname + '/AndroidManifest.xml'
 		# name = '{%s}name' % android_namespace
@@ -398,8 +395,8 @@ class Injector():
 			self.inject_smali(main_activityfile)
 
 		self.build_and_sign()
-		print(colored('I: Frida Gadget injected', 'green'))
-		print(colored('I: Use command frida -U -n Gadget to connect to gadget :)', 'green'))
+		logger.info('Frida Gadget injected')
+		logger.info('Use command frida -U -n Gadget to connect to gadget :)')
 
 	def inject_network_security_config(self):
 		"""
@@ -410,7 +407,7 @@ class Injector():
 			raise InjectorException("E: Please Provide a valid apk file")
 		self.decompile_apk()
 		self.manifest = self.dirname + '/AndroidManifest.xml'
-		self.verbose('Injecting network_security_config.xml file in %s' % self.manifest)
+		logger.debug('Injecting network_security_config.xml file in %s' % self.manifest)
 		if self.netconfpath and os.path.isfile(self.netconfpath) and os.access(self.netconfpath, os.R_OK):
 			copyfile(self.netconfpath, os.path.join(self.dirname, 'res', 'xml'))
 		else:
@@ -426,5 +423,5 @@ class Injector():
 		keyname = '{http://schemas.android.com/apk/res/android}networkSecurityConfig'
 		application.attrib[keyname] = '@xml/network_security_config'
 		parser.write(self.manifest, encoding='utf-8', xml_declaration=True)
-		print(colored('I: Successfully injected network_security_config.xml in %s' % self.manifest, color='green'))
+		logger.info('Successfully injected network_security_config.xml in %s' % self.manifest)
 		self.build_and_sign()

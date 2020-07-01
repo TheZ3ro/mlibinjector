@@ -1,12 +1,19 @@
 #!/usr/bin/env python
 
 import os
+import logging
 
 from optparse import OptionParser
-from termcolor import colored
 
 from . import Injector, InjectorException
 from .__info__ import __authors__, __version__, __description__
+
+# Enable logging
+logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
+LOG_OK = 25
+logging.addLevelName(LOG_OK, "OK")
+logger = logging.getLogger('mlibinjector')
+
 
 def main():
 	desc = '''[mlibinjector %s] -  %s - %s''' % (__version__, __description__, ' & '.join(__authors__))
@@ -30,19 +37,20 @@ def main():
 	parser.add_option('--arch', action='store', dest='arch', help='Add frida gadget for particular arch.(arm64-v8a|armeabi-v7a|x86|x86_64)')
 	parser.add_option('--random', action='store_true', dest='randomize', help='Randomize frida-gadget name')
 	parser.add_option('-V', action='store_true', dest='verbose', help='Verbose')
+	parser.add_option('-q', action='store_true', dest='quiet', help='Quiet (will only print errors and warnings)')
 
 	(v, args) = parser.parse_args()
 	if len(args) != 1:
+		logger.error('Please Provide at least one argument')
 		parser.print_help()
-		print(colored('E: Please Provide at least one argument', color='red'))
 		os._exit(1)
 	apkname = args[0]
 
 	try:
 		inj = Injector(apkname)
 	except InjectorException as e:
+		logger.error(e)
 		parser.print_help()
-		print(colored(e, color='red'))
 		os._exit(1)
 
 	# Injector flags
@@ -74,13 +82,16 @@ def main():
 		inj.randomize_lib()
 
 	if v.verbose:
-		inj._verbose = True
+		logger.setLevel(logging.DEBUG)
+
+	if v.quiet:
+		logger.setLevel(logging.WARN)
 
 	if v.arch:
 		archs = v.arch.split(',')
 		for a in archs:
 			if a not in Injector.abi:
-				print(colored('%s arch is not supported' % a))
+				logger.error('"{}" arch is not supported'.format(a))
 				os._exit(1)
 
 		inj.arch = archs
@@ -106,10 +117,10 @@ def main():
 			inj.inject_frida_gadget(v.libPath)
 
 		else:
-			parser.print_help()
+			logger.error('No action specified')
+			os._exit(1)
 	except InjectorException as e:
-		parser.print_help()
-		print(colored(e, color='red'))
+		logger.error(e)
 		os._exit(1)
 
 if __name__ == '__main__':
