@@ -28,6 +28,9 @@ def main():
 	parser.add_option('-p', action='store', dest='libPath', help='Absolute path to downloaded frida-gadgets (.so) files')
 	parser.add_option('-c', action='store', dest='confpath', help='Absolute path to the frida-gadgets config file (.config.so)')
 	parser.add_option('-f', action='store_true', dest='force', help='Force decompilation and overwrite previous one')
+	parser.add_option('--use-aapt2', action='store_true', dest='aapt2', help='Use aapt2 when rebuilding APKs')
+	parser.add_option('--no-src', action='store_true', dest='nosrc', help='Decompile APK without decompiling DEX classes')
+	parser.add_option('--no-res', action='store_true', dest='nores', help='Decompile APK without decoding resources')
 	parser.add_option('--network', action='store', dest='netconfpath', help='Absolute path to the network_security_config.xml file')
 	parser.add_option('--port', action='store', type=int, dest='port', help='Listen frida-gadget on port number in *listen mode*')
 	parser.add_option('--host', action='store', dest='host', help='Listen frida-gadget on specific network interface in *listen mode*')
@@ -102,10 +105,10 @@ def main():
 			inj.sign_apk()
 
 		elif(v.decompile):
-			inj.decompile_apk()
+			inj.decompile_apk(v.nores, v.nosrc)
 
 		elif(v.build):
-			inj.build_and_sign()
+			inj.build_and_sign(v.aapt2)
 
 		elif(v.enableDebug):
 			inj.enable_debugging()

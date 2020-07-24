@@ -4,7 +4,7 @@ import logging
 from re import match
 from lief import parse as liefparse
 from json import dumps as jsondumps
-from subprocess import check_output as execute, STDOUT
+from subprocess import Popen, STDOUT, PIPE, CalledProcessError
 from termcolor import colored
 from xml.etree import ElementTree as ET
 from shutil import copyfile
@@ -72,8 +72,19 @@ class Injector():
 
 	def exec_cmd(self, cmd):
 		logger.debug(' '.join(cmd))
-		r = execute(cmd, stderr=STDOUT).decode()
-		return r
+		try:
+			command = Popen(cmd, stdout=PIPE, stderr=STDOUT)
+			while True:
+				output = command.stdout.readline()
+				if not output and command.poll() is not None:
+					break
+				if output:
+					logger.debug(str(output.strip(), 'utf-8'))
+			return command.poll()
+		except CalledProcessError as e:
+			logger.error(e)
+			return -1
+		return 42 # should never reach this point
 
 	def inject_lib(native_lib, gadget_lib):
 		"""
@@ -136,7 +147,7 @@ class Injector():
 			exit(1)
 			pass
 
-	def decompile_apk(self):
+	def decompile_apk(self, nores=False, nosrc=False):
 		"""
 		Decompile apk file using apktool.jar
 		"""
@@ -144,8 +155,16 @@ class Injector():
 			raise InjectorException("E: Please Provide a valid apk file")
 		logger.debug('Decompiling %s' % (self.apkname))
 		if self.force or not os.path.isdir(self.dirname):
-			r = self.exec_cmd(["java", "-jar", apktool, "d", "-f", self.apkname])
-			logger.debug(r)
+			self.exec_cmd([
+				"java",
+				"-jar",
+				apktool,
+				"d",
+				"--no-src" if nosrc else "",
+				"--no-res" if nores else "",
+				"-f",
+				self.apkname
+			])
 			logger.info('Decompiled %s' % (self.apkname))
 		else:
 			logger.info('APK already decompiled previously. Using cache for %s' % (self.apkname))
@@ -157,18 +176,31 @@ class Injector():
 		if not self.apk:
 			raise InjectorException("E: Please Provide a valid apk file")
 		logger.debug('Signing %s' % (self.apkname))
-		r = self.exec_cmd(["java", "-jar", sign, self.apkname])
-		logger.debug(r)
+		self.exec_cmd([
+			"java",
+			"-jar",
+			sign,
+			self.apkname
+		])
+		if os.stat(self.apkname).st_size == 0:
+			logger.warn('Cannot sign %s' % (self.apkname))
 		logger.info('Signed %s' % (self.apkname))
 
-	def build_and_sign(self):
+	def build_and_sign(self, aapt2=False):
 		"""
 		Build using apktool.jar
 		sign again using sign.jar
 		"""
 		logger.debug('Building apk file from %s' % (self.dirname))
-		r = self.exec_cmd(["java", "-jar", apktool, "b", "-f", self.dirname])
-		logger.debug(r)
+		self.exec_cmd([
+			"java",
+			"-jar",
+			apktool,
+			"b",
+			"-f",
+			self.dirname,
+			"--use-aapt2" if aapt2 else "",
+		])
 		logger.info('Build done')
 		self.apkname = '%s/dist/%s' % (self.dirname, self.dirname + '.apk')
 		self.sign_apk()
@@ -284,7 +316,7 @@ class Injector():
 			lib_files.extend(glob(libpath + '/*.so'))
 		else:
 			logger.error('Please provide the path to frida-gadget lib(.so) files')
-			os._exit(1)
+			exit(1)
 
 		# For each .so file, find its abi and copy in the lib folder
 		for src in lib_files:
