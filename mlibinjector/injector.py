@@ -52,7 +52,7 @@ class Injector():
 
 		if apkname and os.path.isfile(apkname) and os.access(apkname, os.R_OK):
 			if apkname[-4:] != '.apk':
-				raise InjectorException("E: Please Provide a valid apk file")
+				raise InjectorException("E: Please Provide a valid apk file: {}".format(apkname))
 			self.apkname = apkname
 			self.dirname = self.apkname.split('.apk')[0].replace('\\', '/')
 			self.apk = True
@@ -62,7 +62,7 @@ class Injector():
 				self.dirname = self.dirname[:-1]
 			self.apk = False
 		else:
-			raise InjectorException("E: Please Provide a valid apk file or a directory")
+			raise InjectorException("E: Please Provide a valid apk file or a directory: {}".format(apkname))
 		return
 
 	def randomize_lib(self):
